@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Runic — playback feasibility test</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header><div class="brand">▲ Runic — playback test</div></header>
+<main>
+  <p class="tagline">This checks whether Option 1 (the in-page Spotify player) is possible
+    for this app. You need Spotify <b>Premium</b>. Connect Spotify on the main page first,
+    then come back here.</p>
+
+  <section class="card">
+    <h2>Steps</h2>
+    <ol class="muted" style="line-height:1.9">
+      <li>Auth token: <b id="tokStatus">checking…</b></li>
+      <li>SDK device registered: <b id="devStatus">waiting…</b></li>
+      <li>Devices visible to API: <b id="apiDevStatus">—</b></li>
+      <li>Play a test track on this device: <button id="playBtn" class="primary small" disabled>Play test track</button></li>
+    </ol>
+    <div id="verdict" class="card" style="margin-top:16px"></div>
+    <pre id="log" style="white-space:pre-wrap;color:#8b94a3;font-size:12px;margin-top:12px"></pre>
+  </section>
+  <p class="muted"><a href="/" style="color:var(--accent2)">← back to Runic</a></p>
+</main>
+
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let token = null, deviceId = null;
+const log = (m) => { $("log").textContent += m + "\n"; };
+
+async function getToken() {
+  const r = await fetch("/api/token");
+  if (!r.ok) { $("tokStatus").textContent = "NOT LOGGED IN — connect Spotify on the main page first"; throw new Error("no token"); }
+  token = (await r.json()).access_token;
+  $("tokStatus").textContent = "ok ✓";
+}
+
+window.onSpotifyWebPlaybackSDKReady = async () => {
+  try { await getToken(); } catch { return; }
+
+  const player = new Spotify.Player({
+    name: "Runic",
+    getOAuthToken: (cb) => cb(token),
+    volume: 0.5,
+  });
+
+  player.addListener("ready", async ({ device_id }) => {
+    deviceId = device_id;
+    $("devStatus").textContent = "ok ✓ (" + device_id.slice(0, 8) + "…)";
+    $("playBtn").disabled = false;
+    log("SDK ready, device_id=" + device_id);
+
+    // Check the REST devices endpoint too.
+    const d = await (await fetch("/api/playback/devices")).json();
+    $("apiDevStatus").textContent = d.status === 200
+      ? "ok ✓ (" + (d.body?.devices?.length ?? 0) + " devices)"
+      : "HTTP " + d.status;
+    log("GET /me/player/devices -> " + d.status + " " + JSON.stringify(d.body));
+  });
+
+  player.addListener("not_ready", ({ device_id }) => log("device went offline: " + device_id));
+  player.addListener("initialization_error", ({ message }) => { $("devStatus").textContent = "init error"; log("init_error: " + message); });
+  player.addListener("authentication_error", ({ message }) => { $("devStatus").textContent = "auth error"; log("auth_error: " + message); });
+  player.addListener("account_error", ({ message }) => { $("devStatus").textContent = "account error (Premium required?)"; log("account_error: " + message); });
+
+  const ok = await player.connect();
+  log("player.connect() -> " + ok);
+};
+
+$("playBtn").onclick = async () => {
+  $("playBtn").disabled = true;
+  const r = await (await fetch("/api/playback/play", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId }),
+  })).json();
+  log("PUT /me/player/play -> " + r.status + " " + (r.body || ""));
+  const v = $("verdict");
+  if (r.ok) {
+    v.style.borderColor = "#1db954";
+    v.innerHTML = "<b style='color:#1db954'>✓ Option 1 is POSSIBLE.</b> Playback control works for this app — we can build the in-page run player.";
+  } else if (r.status === 403) {
+    v.style.borderColor = "#e0533d";
+    v.innerHTML = "<b style='color:#e0533d'>✗ Option 1 blocked (403).</b> Same dev-mode restriction as playlist creation. Fall back to Option 2 (export).";
+  } else {
+    v.style.borderColor = "#e0c060";
+    v.innerHTML = "<b style='color:#e0c060'>Inconclusive (HTTP " + r.status + ").</b> See log below.";
+  }
+  $("playBtn").disabled = false;
+};
+</script>
+</body>
+</html>

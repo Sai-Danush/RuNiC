@@ -1,0 +1,83 @@
+# Runic
+
+Terrain-aware running playlist generator. Give it a **GPX route** and your
+**pace**, and it builds an **ordered playlist** whose songs match the terrain:
+on-cadence, high-energy tracks for the climbs, recovery tracks for the descents,
+with the total length fitted to your predicted run time.
+
+Audio features come from [ReccoBeats](https://reccobeats.com) (no API key).
+Spotify is used only to read the track list of **public** playlists.
+
+## How it works
+
+```
+GPX route ─► terrain segments (grade) ─► effort timeline (time + target energy/tempo)
+playlist  ─► Spotify track ids ─► ReccoBeats features (tempo/energy/...) ─► candidates
+                                   └─► hybrid match (tempo + energy) ─► ordered list
+```
+
+- **Tempo** is matched to your running cadence (octave-aware: a 170 and an 85 BPM
+  song both fit a 170 cadence).
+- **Energy** is scaled to grade: steep climbs want ~0.9, descents ~0.5.
+- **Minetti** grade cost makes climbs take longer, so songs land on the right
+  part of the route in *time*.
+
+## Install
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e .            # adds the `runic` command
+# or, without installing:  python -m runic.cli ...
+```
+
+## Setup (only needed for live Spotify playlists)
+
+1. Create a free app at <https://developer.spotify.com/dashboard>.
+2. `cp .env.example .env` and paste your **Client ID** and **Client Secret**.
+
+Only **public** playlists can be read this way. For a private playlist, make it
+public temporarily, or use offline mode (below).
+
+## Usage
+
+```bash
+runic --gpx morning_route.gpx \
+      --pb 5k=22:30 \
+      --playlist https://open.spotify.com/playlist/<id> \
+      --out playlist.csv
+```
+
+The GPX path can be anywhere — absolute or relative to your terminal.
+
+### Common options
+
+| Flag | Purpose |
+|------|---------|
+| `--pb 10k=47:00` | Personal best (repeatable); predicts pace via Riegel. |
+| `--past-run prev.gpx` | Measure pace/cadence from a past run (repeatable). |
+| `--cadence 175` | Override target cadence (steps/min). |
+| `--playlist <url>` | Public Spotify playlist as a song pool (repeatable). |
+| `--candidates-json pool.json` | Offline song pool — no Spotify/ReccoBeats. |
+| `--save-candidates pool.json` | Cache the fetched pool for reuse. |
+| `--w-tempo 0.5 --w-energy 0.4` | Beat-sync vs effort-matching weights. |
+| `--out playlist.csv` | Write CSV (or `.json`). |
+
+### Offline mode (no credentials)
+
+```bash
+runic --gpx tests/fixtures/sample_route.gpx --pb 5k=22:30 \
+      --candidates-json tests/fixtures/candidates.json
+```
+
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
+## Limitations (v1)
+
+- Reads **public** playlists only (Client-Credentials). Private-playlist support
+  and auto-creating the playlist in your account are future work.
+- Cadence is estimated when past-run data lacks it; tune with `--cadence`.

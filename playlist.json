@@ -1,0 +1,186 @@
+[
+  {
+    "order": 1,
+    "start_s": 0.0,
+    "end_s": 211.0,
+    "terrain": "flat",
+    "title": "Heartless",
+    "artists": [
+      "Kanye West"
+    ],
+    "spotify_id": "4EWCNWgDS8707fNSZ1oaA5",
+    "tempo": 87.999,
+    "energy": 0.647,
+    "valence": 0.654,
+    "danceability": 0.79,
+    "reason": "flat: energy 0.65 vs target 0.65, on-cadence (88\u2248172 BPM)"
+  },
+  {
+    "order": 2,
+    "start_s": 211.0,
+    "end_s": 446.7,
+    "terrain": "flat",
+    "title": "In The Night",
+    "artists": [
+      "The Weeknd"
+    ],
+    "spotify_id": "25KybV9BOUlvcnv7nN3Pyo",
+    "tempo": 168.022,
+    "energy": 0.68,
+    "valence": 0.539,
+    "danceability": 0.505,
+    "reason": "flat: energy 0.68 vs target 0.65, on-cadence (168\u2248172 BPM)"
+  },
+  {
+    "order": 3,
+    "start_s": 446.7,
+    "end_s": 684.2,
+    "terrain": "flat",
+    "title": "Flashing Lights",
+    "artists": [
+      "Kanye West",
+      "Dwele"
+    ],
+    "spotify_id": "5TRPicyLGbAF2LGBFbHGvO",
+    "tempo": 90.482,
+    "energy": 0.628,
+    "valence": 0.43,
+    "danceability": 0.639,
+    "reason": "flat: energy 0.63 vs target 0.65, on-cadence (90\u2248172 BPM)"
+  },
+  {
+    "order": 4,
+    "start_s": 684.2,
+    "end_s": 879.5,
+    "terrain": "flat",
+    "title": "Sure Thing",
+    "artists": [
+      "Miguel",
+      "Miguel Pimentel"
+    ],
+    "spotify_id": "0JXXNGljqupsJaZsgSbMZV",
+    "tempo": 81.001,
+    "energy": 0.607,
+    "valence": 0.498,
+    "danceability": 0.684,
+    "reason": "flat: energy 0.61 vs target 0.66, on-cadence (81\u2248172 BPM)"
+  },
+  {
+    "order": 5,
+    "start_s": 879.5,
+    "end_s": 1148.7,
+    "terrain": "up",
+    "title": "I Feel It Coming",
+    "artists": [
+      "The Weeknd",
+      "Daft Punk"
+    ],
+    "spotify_id": "5GXAXm5YOmYT0kL5jHvYBt",
+    "tempo": 92.99,
+    "energy": 0.819,
+    "valence": 0.585,
+    "danceability": 0.773,
+    "reason": "up: energy 0.82 vs target 0.80, on-cadence (93\u2248175 BPM)"
+  },
+  {
+    "order": 6,
+    "start_s": 1148.7,
+    "end_s": 1374.7,
+    "terrain": "up",
+    "title": "24K Magic",
+    "artists": [
+      "Bruno Mars"
+    ],
+    "spotify_id": "6b8Be6ljOzmkOmFslEb23P",
+    "tempo": 106.97,
+    "energy": 0.803,
+    "valence": 0.632,
+    "danceability": 0.818,
+    "reason": "up: energy 0.80 vs target 0.80, off-cadence (107\u2248175 BPM)"
+  },
+  {
+    "order": 7,
+    "start_s": 1374.7,
+    "end_s": 1588.1,
+    "terrain": "down",
+    "title": "LOVE. FEAT. ZACARI.",
+    "artists": [
+      "Kendrick Lamar",
+      "Zacari"
+    ],
+    "spotify_id": "6PGoSes0D9eUDeeAafB2As",
+    "tempo": 126.058,
+    "energy": 0.585,
+    "valence": 0.779,
+    "danceability": 0.8,
+    "reason": "down: energy 0.58 vs target 0.61, off-cadence (126\u2248172 BPM)"
+  },
+  {
+    "order": 8,
+    "start_s": 1588.1,
+    "end_s": 1807.0,
+    "terrain": "down",
+    "title": "Reminder",
+    "artists": [
+      "The Weeknd"
+    ],
+    "spotify_id": "37F0uwRSrdzkBiuj0D5UHI",
+    "tempo": 160.053,
+    "energy": 0.505,
+    "valence": 0.388,
+    "danceability": 0.705,
+    "reason": "down: energy 0.51 vs target 0.51, on-cadence (160\u2248170 BPM)"
+  },
+  {
+    "order": 9,
+    "start_s": 1807.0,
+    "end_s": 2074.0,
+    "terrain": "flat",
+    "title": "Hotline Bling",
+    "artists": [
+      "Drake"
+    ],
+    "spotify_id": "0wwPcA6wtMf6HUMpIRdeP7",
+    "tempo": 134.966,
+    "energy": 0.628,
+    "valence": 0.552,
+    "danceability": 0.891,
+    "reason": "flat: energy 0.63 vs target 0.65, off-cadence (135\u2248172 BPM)"
+  },
+  {
+    "order": 10,
+    "start_s": 2074.0,
+    "end_s": 2285.5,
+    "terrain": "flat",
+    "title": "Pray For Me",
+    "artists": [
+      "The Weeknd",
+      "Kendrick Lamar",
+      "sy"
+    ],
+    "spotify_id": "6huNf4dutXRjJyGn7f5BPS",
+    "tempo": 100.626,
+    "energy": 0.678,
+    "valence": 0.196,
+    "danceability": 0.732,
+    "reason": "flat: energy 0.68 vs target 0.69, off-cadence (101\u2248172 BPM)"
+  },
+  {
+    "order": 11,
+    "start_s": 2285.5,
+    "end_s": 2519.4,
+    "terrain": "flat",
+    "title": "Unforgettable",
+    "artists": [
+      "French Montana",
+      "Swae Lee",
+      "French Montana feat. Swae Lee"
+    ],
+    "spotify_id": "3B54sVLJ402zGa6Xm4YGNe",
+    "tempo": 97.985,
+    "energy": 0.769,
+    "valence": 0.733,
+    "danceability": 0.726,
+    "reason": "flat: energy 0.77 vs target 0.72, off-cadence (98\u2248172 BPM)"
+  }
+]

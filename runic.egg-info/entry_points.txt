@@ -1,0 +1,3 @@
+[console_scripts]
+runic = runic.cli:main
+runic-web = runic.web.app:run
