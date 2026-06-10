@@ -8,3 +8,4 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 python-multipart>=0.0.9
 itsdangerous>=2.1
+ytmusicapi>=1.8

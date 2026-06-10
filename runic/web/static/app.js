@@ -399,6 +399,39 @@ $("csvBtn").onclick = () => {
   setTimeout(() => { $("copyMsg").textContent = ""; }, 5000);
 };
 
+$("ytBtn").onclick = async () => {
+  if (!lastEntries.length) return;
+  const btn = $("ytBtn");
+  btn.disabled = true;
+  $("copyMsg").textContent = "Matching tracks on YouTube Music…";
+  try {
+    const stamp = new Date().toLocaleString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+    const res = await api("/api/ytmusic/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `Runic run — ${stamp}`,
+        tracks: lastEntries.map((e) => ({
+          title: e.title, artist: e.artist, duration_s: e.duration_s,
+        })),
+      }),
+    });
+    let msg = `Created YT Music playlist (${res.matched}/${res.total} matched). `;
+    $("copyMsg").innerHTML =
+      `${escapeHtml(msg)}<a href="${res.url}" target="_blank">Open ▸</a>`;
+    if (res.unmatched && res.unmatched.length) {
+      console.log("Unmatched on YT Music:", res.unmatched);
+    }
+  } catch (e) {
+    $("copyMsg").textContent = "YT Music: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
 function escapeHtml(s) {
   return (s || "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

@@ -17,6 +17,10 @@ env/
 .env.*
 !.env.example
 .runic_token.json
+# YouTube Music auth (ytmusicapi) — personal session, NEVER commit
+browser.json
+oauth.json
+.ytmusic_auth.json
 
 # OS / editor
 .DS_Store
