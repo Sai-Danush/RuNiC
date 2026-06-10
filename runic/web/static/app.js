@@ -152,6 +152,201 @@ $("gpxFile").onchange = async (ev) => {
   }
 };
 
+// --- Map route picker (draw -> BRouter snap + elevation) ---------------------
+
+let map = null;            // Leaflet map (lazy-initialised when map mode shown)
+let markers = [];          // dropped waypoint markers (parallel to `waypoints`)
+let guideLine = null;      // dashed polyline through the raw clicks
+let snappedLine = null;    // solid line of the snapped route returned by BRouter
+let waypoints = [];        // [[lat, lng], ...]
+let baseStreet = null;     // OSM street tiles
+let baseSat = null;        // Esri aerial/satellite tiles
+let satOn = false;         // which base layer is active
+
+function initMap() {
+  if (map) return;
+  if (typeof L === "undefined") {
+    $("map").innerHTML =
+      '<div class="map-fallback">Map library failed to load — check your connection, or use “Upload GPX”.</div>';
+    return;
+  }
+  map = L.map("map");
+  baseStreet = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "© OpenStreetMap contributors",
+  });
+  // Free, keyless aerial imagery — lets you trace actual trails/paths.
+  baseSat = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
+  );
+  baseStreet.addTo(map);
+  // Start zoomed in enough to see paths; re-centre on the user if they allow it.
+  map.setView([51.5074, -0.1278], 15);
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
+      () => {}, { timeout: 5000 }
+    );
+  }
+  map.on("click", (e) => addWaypoint(e.latlng.lat, e.latlng.lng));
+}
+
+// Any edit to the points invalidates the previously snapped route line.
+function invalidateSnapped() {
+  if (snappedLine) { map.removeLayer(snappedLine); snappedLine = null; }
+}
+
+function redrawGuide() {
+  if (guideLine) { map.removeLayer(guideLine); guideLine = null; }
+  if (waypoints.length >= 2)
+    guideLine = L.polyline(waypoints, { color: "#8b94a3", weight: 2, dashArray: "5,6" }).addTo(map);
+}
+
+function refreshControls() {
+  $("useRouteBtn").disabled = waypoints.length < 2;
+  $("undoPtBtn").disabled = waypoints.length === 0;
+  $("clearRouteBtn").disabled = waypoints.length === 0;
+  $("mapHint").textContent =
+    waypoints.length === 0
+      ? "Click the map to drop points along your route."
+      : waypoints.length < 2
+        ? "1 point — add at least one more. Drag a point to move it, click it to remove."
+        : `${waypoints.length} points — “Use this route” to snap. Drag to move, click to remove.`;
+}
+
+function addWaypoint(lat, lng) {
+  const m = L.marker([lat, lng], { draggable: true }).addTo(map);
+  // Click a marker to erase it; drag to fine-tune (e.g. off a water body).
+  m.on("click", (ev) => { L.DomEvent.stopPropagation(ev); removeMarker(m); });
+  m.on("dragend", () => {
+    const i = markers.indexOf(m);
+    if (i === -1) return;
+    const ll = m.getLatLng();
+    waypoints[i] = [ll.lat, ll.lng];
+    invalidateSnapped();
+    redrawGuide();
+  });
+  markers.push(m);
+  waypoints.push([lat, lng]);
+  invalidateSnapped();
+  redrawGuide();
+  refreshControls();
+}
+
+function removeMarker(m) {
+  const i = markers.indexOf(m);
+  if (i === -1) return;
+  map.removeLayer(m);
+  markers.splice(i, 1);
+  waypoints.splice(i, 1);
+  invalidateSnapped();
+  redrawGuide();
+  refreshControls();
+}
+
+function clearRoute() {
+  waypoints = [];
+  markers.forEach((m) => map && map.removeLayer(m));
+  markers = [];
+  if (guideLine) { map.removeLayer(guideLine); guideLine = null; }
+  if (snappedLine) { map.removeLayer(snappedLine); snappedLine = null; }
+  $("routeStats").classList.add("hidden");
+  $("chartWrap").classList.add("hidden");
+  routeLoaded = false;
+  refreshControls();
+}
+
+$("clearRouteBtn").onclick = clearRoute;
+$("undoPtBtn").onclick = () => { if (markers.length) removeMarker(markers[markers.length - 1]); };
+
+// Satellite / street base-layer toggle.
+$("layerToggleBtn").onclick = () => {
+  if (!map) return;
+  satOn = !satOn;
+  if (satOn) {
+    map.removeLayer(baseStreet); baseSat.addTo(map);
+    $("layerToggleBtn").textContent = "Street map";
+  } else {
+    map.removeLayer(baseSat); baseStreet.addTo(map);
+    $("layerToggleBtn").textContent = "Satellite";
+  }
+};
+
+// Place search — jump the map to a town/park/address (free OSM geocoding).
+async function searchPlace() {
+  const q = $("placeSearch").value.trim();
+  if (!q || !map) return;
+  $("mapHint").textContent = "Searching…";
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+      { headers: { Accept: "application/json" } }
+    );
+    const arr = await r.json();
+    if (!arr.length) {
+      $("mapHint").textContent = `No place found for “${q}”. Try a more specific name.`;
+      return;
+    }
+    map.setView([parseFloat(arr[0].lat), parseFloat(arr[0].lon)], 15);
+    refreshControls();
+  } catch {
+    $("mapHint").textContent = "Place search failed — check your connection.";
+  }
+}
+$("placeSearchBtn").onclick = searchPlace;
+$("placeSearch").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); searchPlace(); }
+});
+
+$("useRouteBtn").onclick = async () => {
+  if (waypoints.length < 2) return;
+  clearError();
+  const btn = $("useRouteBtn");
+  btn.disabled = true;
+  $("mapHint").textContent = "Snapping to paths & fetching elevation…";
+  try {
+    const d = await api("/api/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ waypoints, profile: "hiking-beta" }),
+    });
+    routeLoaded = true;
+    renderRoute(d);
+    // Replace the dashed guide with the snapped route line.
+    if (guideLine) { map.removeLayer(guideLine); guideLine = null; }
+    if (snappedLine) map.removeLayer(snappedLine);
+    if (d.geometry && d.geometry.length) {
+      snappedLine = L.polyline(d.geometry, { color: "#1db954", weight: 4 }).addTo(map);
+      map.fitBounds(snappedLine.getBounds(), { padding: [30, 30] });
+    }
+    $("mapHint").textContent = `Route ready — ${d.distance_km} km. Drag or add points to redraw.`;
+  } catch (e) {
+    // Most common cause: a point landed on water / off any path.
+    showError("Route error: " + e.message + " Drag any point off water onto a road or path, then try again.");
+    $("mapHint").textContent = `${waypoints.length} points — drag a point onto a path, then “Use this route”.`;
+  } finally {
+    btn.disabled = waypoints.length < 2;
+  }
+};
+
+// Mode toggle: draw on map (default) vs upload GPX.
+function setRouteMode(mode) {
+  const onMap = mode === "map";
+  $("modeMapBtn").classList.toggle("active", onMap);
+  $("modeUploadBtn").classList.toggle("active", !onMap);
+  $("routeMap").classList.toggle("hidden", !onMap);
+  $("routeUpload").classList.toggle("hidden", onMap);
+  if (onMap) {
+    initMap();
+    // Leaflet needs a sized, visible container to compute tile layout.
+    setTimeout(() => map && map.invalidateSize(), 0);
+  }
+}
+$("modeMapBtn").onclick = () => setRouteMode("map");
+$("modeUploadBtn").onclick = () => setRouteMode("upload");
+// Map is the default mode; init it once the page is ready.
+setRouteMode("map");
+
 function renderRoute(d) {
   $("routeStats").classList.remove("hidden");
   $("routeStats").innerHTML = `

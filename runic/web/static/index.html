@@ -6,6 +6,8 @@
 <title>Runic — terrain-matched running playlists</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://sdk.scdn.co/spotify-player.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -46,12 +48,38 @@
 
       <!-- STEP 2: route -->
       <div id="step-route" class="step">
-        <h2><span class="num">2</span> Upload your route (GPX)</h2>
-        <div class="row filepick">
-          <input type="file" id="gpxFile" accept=".gpx" class="file-input" />
-          <label for="gpxFile" class="file-btn">▲ Choose GPX file</label>
-          <span id="fileName" class="muted">No file selected</span>
+        <h2><span class="num">2</span> Your route</h2>
+        <div class="route-modes">
+          <button id="modeMapBtn" class="pill active" type="button">Draw on map</button>
+          <button id="modeUploadBtn" class="pill" type="button">Upload GPX</button>
         </div>
+
+        <!-- MODE A: draw on a map (snapped to paths + elevation via BRouter) -->
+        <div id="routeMap">
+          <div class="map-search">
+            <input type="text" id="placeSearch" placeholder="Search a place (town, park, address)…" />
+            <button id="placeSearchBtn" class="ghost small" type="button">Search</button>
+            <button id="layerToggleBtn" class="ghost small" type="button">Satellite</button>
+          </div>
+          <div id="map"></div>
+          <div class="row map-ctrls">
+            <span id="mapHint" class="muted">Click the map to drop points along your route.</span>
+            <button id="useRouteBtn" class="primary small" disabled>Use this route</button>
+            <button id="undoPtBtn" class="ghost small" disabled>Undo point</button>
+            <button id="clearRouteBtn" class="ghost small" disabled>Clear</button>
+          </div>
+        </div>
+
+        <!-- MODE B: upload a GPX file (unchanged) -->
+        <div id="routeUpload" class="hidden">
+          <div class="row filepick">
+            <input type="file" id="gpxFile" accept=".gpx" class="file-input" />
+            <label for="gpxFile" class="file-btn">▲ Choose GPX file</label>
+            <span id="fileName" class="muted">No file selected</span>
+          </div>
+        </div>
+
+        <!-- Shared by both modes -->
         <div id="routeStats" class="stats hidden"></div>
         <div id="chartWrap" class="hidden"><canvas id="eleChart" height="120"></canvas></div>
       </div>

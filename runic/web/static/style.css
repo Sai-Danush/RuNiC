@@ -119,6 +119,22 @@ td a:hover { text-decoration: underline; }
 .pill.active { background: var(--accent); color: #04110a; }
 .custom-km { width: 90px; }
 
+/* Route mode toggle (draw on map / upload GPX) + the map itself. */
+.route-modes { display: inline-flex; background: var(--card2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 3px; gap: 2px; margin-bottom: 12px; }
+#map { height: 420px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--card2); z-index: 0; }
+.map-search { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.map-search input {
+  flex: 1; min-width: 0; background: var(--card2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 14px;
+}
+.map-search input:focus-visible { outline: 2px solid var(--accent2); }
+.map-fallback { display: flex; align-items: center; justify-content: center;
+  height: 100%; padding: 20px; text-align: center; color: var(--muted); }
+.map-ctrls { gap: 12px; align-items: center; margin-top: 10px; }
+.map-ctrls #mapHint { flex: 1; }
+
 .time-sel { display: inline-flex; align-items: flex-end; gap: 4px; }
 .time-sel .colon { font-size: 22px; color: var(--muted); padding-bottom: 22px; }
 .t-unit { display: flex; flex-direction: column; align-items: center; gap: 3px; transition: opacity .15s; }
