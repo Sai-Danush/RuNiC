@@ -401,19 +401,20 @@ $("csvBtn").onclick = () => {
 
 $("ytBtn").onclick = async () => {
   if (!lastEntries.length) return;
+  // Let the runner name the playlist; keeping the default leaves it as a plain
+  // "Runic run" (no date/time appended).
+  const name = prompt("Name your YouTube Music playlist:", "Runic run");
+  if (name === null) return;                  // cancelled
+  const title = name.trim() || "Runic run";   // blank falls back to the default
   const btn = $("ytBtn");
   btn.disabled = true;
   $("copyMsg").textContent = "Matching tracks on YouTube Music…";
   try {
-    const stamp = new Date().toLocaleString(undefined, {
-      year: "numeric", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
     const res = await api("/api/ytmusic/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title: `Runic run — ${stamp}`,
+        title,
         tracks: lastEntries.map((e) => ({
           title: e.title, artist: e.artist, duration_s: e.duration_s,
         })),
