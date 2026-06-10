@@ -535,10 +535,31 @@ async def api_ytmusic_create(request: Request):
 
 @app.get("/")
 def index():
-    return FileResponse(_STATIC_DIR / "index.html")
+    # no-cache so a freshly pulled/edited index.html is always picked up.
+    return FileResponse(
+        _STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"}
+    )
 
 
-app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+class _NoCacheStatic(StaticFiles):
+    """StaticFiles that asks the browser to revalidate every asset.
+
+    Local self-host tool: each user pulls and runs their own copy, so when the
+    CSS/JS changes (a git pull, or hacking locally) a normal refresh must show
+    it. Without this, browsers heuristically cache /static assets and serve a
+    stale style.css/app.js — which silently breaks new UI (e.g. the map div
+    collapsing to zero height because the old CSS lacks its rule). ``no-cache``
+    keeps caching (cheap 304s via ETag) but forces revalidation, so assets are
+    never stale.
+    """
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        resp = await super().get_response(path, scope)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/static", _NoCacheStatic(directory=_STATIC_DIR), name="static")
 
 
 def run() -> None:
