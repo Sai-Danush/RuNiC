@@ -377,6 +377,28 @@ $("copyBtn").onclick = async () => {
   setTimeout(() => { $("copyMsg").textContent = ""; }, 4000);
 };
 
+function csvCell(s) {
+  s = (s == null ? "" : String(s));
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+$("csvBtn").onclick = () => {
+  if (!lastEntries.length) return;
+  const header = ["Title", "Artist", "Spotify URL"];
+  const rows = lastEntries.map((e) => [e.title, e.artist, e.url].map(csvCell).join(","));
+  const csv = [header.join(","), ...rows].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "runic-playlist.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  $("copyMsg").textContent = `Downloaded ${lastEntries.length} tracks — import at tunemymusic.com.`;
+  setTimeout(() => { $("copyMsg").textContent = ""; }, 5000);
+};
+
 function escapeHtml(s) {
   return (s || "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
