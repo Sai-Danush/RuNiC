@@ -1,0 +1,10 @@
+# Runtime dependencies for the Runic web app (mirrors pyproject.toml core + web).
+# Local dev can instead use:  pip install -e ".[web]"
+gpxpy>=1.6
+requests>=2.31
+python-dotenv>=1.0
+rich>=13.0
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+itsdangerous>=2.1

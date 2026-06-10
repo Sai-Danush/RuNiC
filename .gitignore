@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and local state (NEVER commit these)
+.env
+.env.*
+!.env.example
+.runic_token.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

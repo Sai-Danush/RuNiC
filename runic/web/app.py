@@ -19,6 +19,7 @@ Run with: ``runic-web`` (or ``uvicorn runic.web.app:app``). Serves on
 from __future__ import annotations
 
 import base64
+import os
 import secrets
 import tempfile
 import time
@@ -52,8 +53,14 @@ _SCOPES = (
 
 # A widely-available track for the playback feasibility test (Blinding Lights).
 _TEST_TRACK_URI = "spotify:track:0VjIjW4GlUZAMYd2vXMi3b"
-_PORT = 8888
-_REDIRECT_URI = f"http://127.0.0.1:{_PORT}/callback"
+# Host/port: defaults suit local dev; deploy platforms inject PORT (and you set
+# HOST=0.0.0.0). The OAuth callback defaults to localhost but is overridable so
+# a deployed app can point Spotify at its real HTTPS domain.
+_HOST = os.environ.get("HOST", "127.0.0.1")
+_PORT = int(os.environ.get("PORT", "8888"))
+_REDIRECT_URI = os.environ.get(
+    "RUNIC_REDIRECT_URI", f"http://127.0.0.1:{_PORT}/callback"
+)
 _TIMEOUT = 20
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -61,7 +68,10 @@ _STATIC_DIR = Path(__file__).parent / "static"
 app = FastAPI(title="Runic")
 app.add_middleware(
     SessionMiddleware,
-    secret_key=secrets.token_urlsafe(32),  # ephemeral per-process; fine for local
+    # Stable secret in production (set SESSION_SECRET); ephemeral per-process
+    # locally — fine for dev, but it logs users out on every restart, so a
+    # deployed app should always set SESSION_SECRET.
+    secret_key=os.environ.get("SESSION_SECRET") or secrets.token_urlsafe(32),
     same_site="lax",
     max_age=60 * 60 * 8,
 )
@@ -417,7 +427,7 @@ def run() -> None:
     """Console-script entry point: ``runic-web``."""
     import uvicorn
 
-    uvicorn.run("runic.web.app:app", host="127.0.0.1", port=_PORT, reload=False)
+    uvicorn.run("runic.web.app:app", host=_HOST, port=_PORT, reload=False)
 
 
 if __name__ == "__main__":
