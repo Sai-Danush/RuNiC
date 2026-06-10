@@ -406,9 +406,51 @@ async def api_generate(request: Request):
                 "reason": e.reason,
                 "spotify_id": e.song.spotify_id,
                 "url": f"https://open.spotify.com/track/{e.song.spotify_id}",
+                "duration_s": round(e.song.duration_s),
             }
             for e in entries
         ],
+    }
+
+
+@app.post("/api/ytmusic/create")
+async def api_ytmusic_create(request: Request):
+    """Create a YouTube Music playlist from the terrain-ordered tracks.
+
+    Body: ``{"title": str, "tracks": [{"title","artist","duration_s"}, ...]}``.
+    Each track is re-resolved to a YT Music song by search (auto-pick best by
+    title/artist overlap + duration anchor), then a private playlist is created
+    preserving order. Needs a YT Music auth file (see ``runic.ytmusic``).
+    """
+    from runic.ytmusic import create_playlist, get_client, match_tracks
+
+    body = await request.json()
+    tracks = body.get("tracks") or []
+    title = (body.get("title") or "Runic run").strip()
+    if not tracks:
+        raise HTTPException(400, "No tracks to add.")
+
+    try:
+        yt = get_client()
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    matches = match_tracks(yt, tracks)
+    video_ids = [m.video_id for m in matches if m.video_id]
+    if not video_ids:
+        raise HTTPException(400, "Could not match any tracks on YouTube Music.")
+
+    try:
+        playlist_id = create_playlist(yt, title, video_ids)
+    except Exception as exc:  # surface YT Music / auth failures to the UI
+        raise HTTPException(400, f"YouTube Music playlist creation failed: {exc}") from exc
+
+    return {
+        "playlist_id": playlist_id,
+        "url": f"https://music.youtube.com/playlist?list={playlist_id}",
+        "matched": len(video_ids),
+        "total": len(tracks),
+        "unmatched": [m.title for m in matches if not m.video_id],
     }
 
 
