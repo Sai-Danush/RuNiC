@@ -152,6 +152,109 @@ $("gpxFile").onchange = async (ev) => {
   }
 };
 
+// --- Map route picker (draw -> BRouter snap + elevation) ---------------------
+
+let map = null;            // Leaflet map (lazy-initialised when map mode shown)
+let markers = [];          // dropped waypoint markers
+let guideLine = null;      // dashed polyline through the raw clicks
+let snappedLine = null;    // solid line of the snapped route returned by BRouter
+let waypoints = [];        // [[lat, lng], ...]
+
+function initMap() {
+  if (map) return;
+  map = L.map("map");
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(map);
+  // Centre on the user if they allow it; otherwise a sensible default view.
+  map.setView([51.5074, -0.1278], 13);
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 14),
+      () => {}, { timeout: 5000 }
+    );
+  }
+  map.on("click", (e) => addWaypoint(e.latlng.lat, e.latlng.lng));
+}
+
+function addWaypoint(lat, lng) {
+  waypoints.push([lat, lng]);
+  markers.push(L.marker([lat, lng]).addTo(map));
+  // Drawing fresh waypoints invalidates any previously snapped route.
+  if (snappedLine) { map.removeLayer(snappedLine); snappedLine = null; }
+  if (guideLine) map.removeLayer(guideLine);
+  guideLine = L.polyline(waypoints, { color: "#8b94a3", weight: 2, dashArray: "5,6" }).addTo(map);
+  $("useRouteBtn").disabled = waypoints.length < 2;
+  $("mapHint").textContent =
+    waypoints.length < 2
+      ? "Click the map to drop points along your route."
+      : `${waypoints.length} points — click “Use this route” to snap & analyse.`;
+}
+
+function clearRoute() {
+  waypoints = [];
+  markers.forEach((m) => map && map.removeLayer(m));
+  markers = [];
+  if (guideLine) { map.removeLayer(guideLine); guideLine = null; }
+  if (snappedLine) { map.removeLayer(snappedLine); snappedLine = null; }
+  $("useRouteBtn").disabled = true;
+  $("mapHint").textContent = "Click the map to drop points along your route.";
+  $("routeStats").classList.add("hidden");
+  $("chartWrap").classList.add("hidden");
+  routeLoaded = false;
+}
+
+$("clearRouteBtn").onclick = clearRoute;
+
+$("useRouteBtn").onclick = async () => {
+  if (waypoints.length < 2) return;
+  clearError();
+  const btn = $("useRouteBtn");
+  btn.disabled = true;
+  $("mapHint").textContent = "Snapping to paths & fetching elevation…";
+  try {
+    const d = await api("/api/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ waypoints, profile: "hiking-beta" }),
+    });
+    routeLoaded = true;
+    renderRoute(d);
+    // Replace the dashed guide with the snapped route line.
+    if (guideLine) { map.removeLayer(guideLine); guideLine = null; }
+    if (snappedLine) map.removeLayer(snappedLine);
+    if (d.geometry && d.geometry.length) {
+      snappedLine = L.polyline(d.geometry, { color: "#1db954", weight: 4 }).addTo(map);
+      map.fitBounds(snappedLine.getBounds(), { padding: [30, 30] });
+    }
+    $("mapHint").textContent = `Route ready — ${d.distance_km} km. Add points to redraw.`;
+  } catch (e) {
+    showError("Route error: " + e.message);
+    $("mapHint").textContent = "Click the map to drop points along your route.";
+  } finally {
+    btn.disabled = waypoints.length < 2;
+  }
+};
+
+// Mode toggle: draw on map (default) vs upload GPX.
+function setRouteMode(mode) {
+  const onMap = mode === "map";
+  $("modeMapBtn").classList.toggle("active", onMap);
+  $("modeUploadBtn").classList.toggle("active", !onMap);
+  $("routeMap").classList.toggle("hidden", !onMap);
+  $("routeUpload").classList.toggle("hidden", onMap);
+  if (onMap) {
+    initMap();
+    // Leaflet needs a sized, visible container to compute tile layout.
+    setTimeout(() => map && map.invalidateSize(), 0);
+  }
+}
+$("modeMapBtn").onclick = () => setRouteMode("map");
+$("modeUploadBtn").onclick = () => setRouteMode("upload");
+// Map is the default mode; init it once the page is ready.
+setRouteMode("map");
+
 function renderRoute(d) {
   $("routeStats").classList.remove("hidden");
   $("routeStats").innerHTML = `

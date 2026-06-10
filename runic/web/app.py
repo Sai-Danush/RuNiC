@@ -44,6 +44,9 @@ from ..spotify_client import collect_candidate_ids, extract_playlist_id
 _AUTH_URL = "https://accounts.spotify.com/authorize"
 _TOKEN_URL = "https://accounts.spotify.com/api/token"
 _API = "https://api.spotify.com/v1"
+# Free, keyless routing+elevation: snaps drawn waypoints to footpaths and returns
+# GPX with SRTM <ele> tags. Used by the "draw on map" route picker.
+_BROUTER_URL = "https://brouter.de/brouter"
 # Read scopes for listing playlists + profile, plus playback scopes for the
 # in-page Web Playback SDK player (Option 1 feasibility probe).
 _SCOPES = (
@@ -301,6 +304,48 @@ def _elevation_points(route: RouteProfile, max_points: int = 200) -> list[dict]:
     return pts
 
 
+def _route_response(route: RouteProfile) -> dict:
+    """Shape a parsed RouteProfile into the JSON the frontend's renderRoute() wants.
+    Shared by /api/gpx (uploaded file) and /api/route (drawn on the map) so both
+    paths feed the identical analysis + chart."""
+    terrain_counts: dict[str, int] = {}
+    for seg in route.segments:
+        terrain_counts[seg.terrain.value] = terrain_counts.get(seg.terrain.value, 0) + 1
+    return {
+        "distance_km": round(route.total_distance_m / 1000.0, 2),
+        "ascent_m": round(route.total_ascent_m),
+        "descent_m": round(route.total_descent_m),
+        "n_segments": len(route.segments),
+        "elevation": _elevation_points(route),
+        "terrain_counts": terrain_counts,
+        "segments": [
+            {"km": round(s.start_m / 1000.0, 3), "terrain": s.terrain.value}
+            for s in route.segments
+        ],
+    }
+
+
+def _gpx_latlngs(gpx_text: str, max_points: int = 300) -> list[list[float]]:
+    """Extract the track geometry as [[lat, lng], ...] so the map can draw the
+    snapped path. Cosmetic only — returns [] if the GPX can't be parsed."""
+    try:
+        import gpxpy  # lazy: only needed for the map flow
+
+        gpx = gpxpy.parse(gpx_text)
+        pts: list[list[float]] = [
+            [p.latitude, p.longitude]
+            for track in gpx.tracks
+            for seg in track.segments
+            for p in seg.points
+        ]
+    except Exception:
+        return []
+    if len(pts) > max_points:
+        step = len(pts) / max_points
+        pts = [pts[int(i * step)] for i in range(max_points)] + [pts[-1]]
+    return pts
+
+
 @app.post("/api/gpx")
 async def api_gpx(request: Request, file: UploadFile):
     raw = await file.read()
@@ -314,23 +359,54 @@ async def api_gpx(request: Request, file: UploadFile):
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(400, f"Could not parse GPX: {exc}") from exc
     _ROUTES[_sid(request)] = route
+    return _route_response(route)
 
-    terrain_counts: dict[str, int] = {}
-    for seg in route.segments:
-        terrain_counts[seg.terrain.value] = terrain_counts.get(seg.terrain.value, 0) + 1
 
-    return {
-        "distance_km": round(route.total_distance_m / 1000.0, 2),
-        "ascent_m": round(route.total_ascent_m),
-        "descent_m": round(route.total_descent_m),
-        "n_segments": len(route.segments),
-        "elevation": _elevation_points(route),
-        "terrain_counts": terrain_counts,
-        "segments": [
-            {"km": round(s.start_m / 1000.0, 3), "terrain": s.terrain.value}
-            for s in route.segments
-        ],
-    }
+@app.post("/api/route")
+async def api_route(request: Request):
+    """Build a route from waypoints drawn on the map. BRouter snaps the points to
+    real footpaths and returns GPX with SRTM elevation; we then run it through the
+    same parse_route pipeline as an uploaded GPX."""
+    body = await request.json()
+    wps = body.get("waypoints") or []  # [[lat, lng], ...]
+    if len(wps) < 2:
+        raise HTTPException(400, "Pick at least a start and an end point on the map.")
+    profile = body.get("profile") or "hiking-beta"  # foot profile (verified working)
+    try:
+        # BRouter wants lon,lat (longitude FIRST), pipe-separated.
+        lonlats = "|".join(f"{float(lng)},{float(lat)}" for lat, lng in wps)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(400, "Invalid waypoints.") from exc
+
+    try:
+        resp = requests.get(
+            _BROUTER_URL,
+            params={
+                "lonlats": lonlats,
+                "profile": profile,
+                "alternativeidx": 0,
+                "format": "gpx",
+            },
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(502, f"Routing service unreachable: {exc}") from exc
+    # BRouter signals failure with a 500 + plaintext body (no path found, etc.).
+    if not resp.ok or "<trkpt" not in resp.text:
+        raise HTTPException(
+            400, "Couldn't route between those points — try moving them onto a path."
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=".gpx", delete=True) as tmp:
+        tmp.write(resp.content)
+        tmp.flush()
+        try:
+            route = parse_route(tmp.name)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(400, f"Could not parse generated route: {exc}") from exc
+    _ROUTES[_sid(request)] = route
+
+    return {**_route_response(route), "geometry": _gpx_latlngs(resp.text)}
 
 
 @app.post("/api/generate")
