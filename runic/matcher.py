@@ -104,11 +104,11 @@ def build_playlist(
     """Fit the run timeline with the best-matching songs.
 
     Unlike a pure left-to-right greedy walk (which lets early flat slots eat the
-    songs that climbs need), this assigns songs to time-buckets *most-demanding
-    first*: buckets whose target energy sits furthest from the pool's average get
-    first pick. Steep climbs and recovery descents are the pickiest, so they're
-    served before generic flat sections. Songs are then emitted in time order and
-    trimmed to the predicted run length.
+    songs the demanding sections need), this assigns songs to time-buckets
+    *most-demanding first*: buckets whose target energy sits furthest from the
+    pool's average get first pick. Steep descents (attack) and recovery climbs
+    are the pickiest, so they're served before generic flat sections. Songs are
+    then emitted in time order and trimmed to the predicted run length.
     """
     w = weights or Weights()
     pool = [s for s in songs if s.duration_ms > 0]
