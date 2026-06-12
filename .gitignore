@@ -22,6 +22,11 @@ browser.json
 oauth.json
 .ytmusic_auth.json
 
+# Generated run outputs (playlists / exports)
+playlist.json
+playlist.csv
+*_tunemymusic.csv
+
 # OS / editor
 .DS_Store
 .idea/
