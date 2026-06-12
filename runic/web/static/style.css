@@ -103,6 +103,17 @@ th { color: var(--muted); font-weight: 600; }
 .terr.down, .terr.steep_down { background: #18301f; color: #7fe0a0; }
 td a { color: var(--accent2); text-decoration: none; }
 td a:hover { text-decoration: underline; }
+/* 👍/👎 per-song rating (drives personalization) */
+.rate { white-space: nowrap; }
+.thumb { background: transparent; border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 7px; margin-right: 4px; font-size: 14px; cursor: pointer; opacity: .55; }
+.thumb:hover { opacity: 1; }
+.thumb.up.on { opacity: 1; border-color: var(--accent); background: #14241a; }
+.thumb.down.on { opacity: 1; border-color: var(--warn); background: #3a1a16; }
+/* Personalization badge in the results summary */
+.pz { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--card2);
+  border: 1px solid var(--line); color: var(--muted); }
+.pz.on { color: var(--accent); border-color: var(--accent); }
 /* Pace: distance pills + time selector */
 .pb {
   display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;

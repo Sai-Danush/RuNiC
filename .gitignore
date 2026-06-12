@@ -17,6 +17,9 @@ env/
 .env.*
 !.env.example
 .runic_token.json
+# Personalization: your ratings log + learned weights (personal, NEVER commit)
+.runic_feedback.jsonl
+.runic_weights.json
 # YouTube Music auth (ytmusicapi) — personal session, NEVER commit
 browser.json
 oauth.json
