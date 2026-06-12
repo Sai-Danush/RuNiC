@@ -2,8 +2,9 @@
 
 Terrain-aware running playlist generator. Give it a **GPX route** and your
 **pace**, and it builds an **ordered playlist** whose songs match the terrain:
-on-cadence, high-energy tracks for the climbs, recovery tracks for the descents,
-with the total length fitted to your predicted run time.
+energetic, on-cadence tracks for the descents (attack the downhills), chiller
+cruise tracks for the climbs (recover on the ups), with the total length fitted
+to your predicted run time.
 
 Audio features come from [ReccoBeats](https://reccobeats.com) (no API key).
 Spotify is used only to read the track list of **public** playlists.
@@ -18,36 +19,30 @@ playlist  ─► Spotify track ids ─► ReccoBeats features (tempo/energy/...)
 
 - **Tempo** is matched to your running cadence (octave-aware: a 170 and an 85 BPM
   song both fit a 170 cadence).
-- **Energy** is scaled to grade: steep climbs want ~0.9, descents ~0.5.
+- **Energy** is scaled to grade: fast descents want ~0.9, climbs cruise around ~0.5.
 - **Minetti** grade cost makes climbs take longer, so songs land on the right
   part of the route in *time*.
 
-## Run it yourself — the web app (local)
+---
 
-Runic is **not hosted** — you run it on your own machine. It's a small FastAPI app:
-upload a GPX, log into Spotify, pick playlists, and it builds the terrain-matched
-list with an in-browser player. Everything (including any auth tokens) stays local.
+## Setup
 
-### 1. Clone + install
+Runic is **not hosted** — you run it on your own machine. It's a small FastAPI
+app: upload a GPX, log into Spotify, pick playlists, and it builds the
+terrain-matched list with an in-browser player. Everything (including any auth
+tokens) stays local.
 
-```bash
-git clone https://github.com/Sai-Danush/RuNiC.git && cd RuNiC
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[web]"     # FastAPI + uvicorn + ytmusicapi, plus the engine
-```
+Do these three steps **before** running anything. Step 3 is optional.
 
-### 2. Create a Spotify app (required)
+### Step 1 — Create a Spotify app (required, ~2 min)
 
 There are no shared credentials — `.env` is git-ignored and never committed, so
-**everyone runs their own Spotify app**. It takes about two minutes:
+**everyone runs their own Spotify app**:
 
 1. Go to <https://developer.spotify.com/dashboard> → **Create app**.
 2. Add this **Redirect URI** exactly: `http://127.0.0.1:8888/callback`, then **Save**.
-3. Open the app's **Settings**, copy the **Client ID** and **Client Secret**, and
-   paste both into your `.env`:
-   ```bash
-   cp .env.example .env       # then paste both values into .env (git-ignored)
-   ```
+3. Open the app's **Settings** and copy the **Client ID** and **Client Secret** —
+   you'll paste them into `.env` in Step 2.
 4. **Dev-mode caveats** (Spotify locks new apps to development mode):
    - Under **Settings → User Management**, add yourself to the allowlist — enter the
      **display name *and* email** of the Spotify account you'll log in with.
@@ -56,32 +51,22 @@ There are no shared credentials — `.env` is git-ignored and never committed, s
      and the player is **desktop-browser only** — it will *not* play inside iOS
      Safari or Android Chrome. (Mobile playback is covered by the exports below.)
 
-### 3. Run
+### Step 2 — Clone, install, and add your credentials
 
 ```bash
-runic-web                    # serves http://127.0.0.1:8888
+git clone https://github.com/Sai-Danush/RuNiC.git && cd RuNiC
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[web]"     # FastAPI + uvicorn + ytmusicapi, plus the engine
+
+cp .env.example .env        # then paste the Client ID + Secret from Step 1 (git-ignored)
 ```
 
-Open <http://127.0.0.1:8888>, **Log in with Spotify**, upload your GPX, add a
-personal best (e.g. `5k=22:30`), pick one or more **public** playlists as the song
-pool, and hit **Generate**. Play it right there in the browser, or export it:
+### Step 3 — Connect YouTube Music (optional)
 
-### 4. Get the playlist onto your phone
+Only needed for the **"Create YT Music playlist"** export (native playback on your
+phone). Skip it if you'll use the Spotify/CSV route instead.
 
-Both buttons are in the results panel:
-
-- **→ Spotify (any device): "Download CSV"** → import the CSV at
-  [tunemymusic.com](https://www.tunemymusic.com) (free, ≤500 tracks/transfer) to
-  create a real Spotify playlist that plays natively on your phone. (Runic can't
-  create the Spotify playlist directly — dev-mode apps get a 403 on playlist
-  creation — hence the CSV → TuneMyMusic hop.)
-- **→ YouTube Music (native mobile playback): "Create YT Music playlist"** →
-  creates a real private YT Music playlist on your account. Needs a one-time
-  auth-file setup (below).
-
-### 5. One-time YouTube Music setup (only for the YT Music button)
-
-`ytmusicapi` needs your YT Music session. It's read from a local `browser.json`
+`ytmusicapi` needs your YT Music session, read from a local `browser.json`
 (git-ignored, never leaves your machine):
 
 1. Open <https://music.youtube.com> **logged in**, open DevTools → **Network**,
@@ -106,6 +91,32 @@ months; sooner if you log out or change your password) — just re-run these ste
 > Optional, more durable alternative: `ytmusicapi oauth` sets up a refresh-token
 > `oauth.json` instead of a cookie, but needs a Google Cloud OAuth client. Overkill
 > for local use — the cookie is simpler.
+
+---
+
+## Running it
+
+```bash
+runic-web                    # serves http://127.0.0.1:8888
+```
+
+Open <http://127.0.0.1:8888>, **Log in with Spotify**, upload your GPX, add a
+personal best (e.g. `5k=22:30`), pick one or more **public** playlists as the song
+pool, and hit **Generate**. Play it right there in the browser, or export it to
+your phone (below).
+
+## Get the playlist onto your phone
+
+Both buttons are in the results panel:
+
+- **→ Spotify (any device): "Download CSV"** → import the CSV at
+  [tunemymusic.com](https://www.tunemymusic.com) (free, ≤500 tracks/transfer) to
+  create a real Spotify playlist that plays natively on your phone. (Runic can't
+  create the Spotify playlist directly — dev-mode apps get a 403 on playlist
+  creation — hence the CSV → TuneMyMusic hop.)
+- **→ YouTube Music (native mobile playback): "Create YT Music playlist"** →
+  creates a real private YT Music playlist on your account. Requires the one-time
+  auth setup from **Step 3** above.
 
 ## Tests
 
