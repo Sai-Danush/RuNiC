@@ -22,6 +22,8 @@ playlist  ─► Spotify track ids ─► ReccoBeats features (tempo/energy/...)
 - **Energy** is scaled to grade: fast descents want ~0.9, climbs cruise around ~0.5.
 - **Minetti** grade cost makes climbs take longer, so songs land on the right
   part of the route in *time*.
+- **Personalization** (optional): your 👍/👎 ratings re-weight the match *per
+  terrain* over time — see [Learns your taste](#learns-your-taste-the-more-you-use-it).
 
 ---
 
@@ -117,6 +119,32 @@ Both buttons are in the results panel:
 - **→ YouTube Music (native mobile playback): "Create YT Music playlist"** →
   creates a real private YT Music playlist on your account. Requires the one-time
   auth setup from **Step 3** above.
+
+## Learns your taste (the more you use it)
+
+Every generated playlist has a 👍 / 👎 on each song. Rate a few, hit **Generate**
+again, and Runic re-fits to *your* taste — used consistently, it keeps getting
+better at picking songs you'll actually want on each kind of terrain.
+
+- **It learns from a song's *parameters*, never its identity.** A logistic
+  regression learns how much each audio factor — energy- and tempo-fit, valence,
+  danceability, loudness, acousticness, instrumentalness, speechiness, liveness —
+  should count toward a 👍. So it generalizes to brand-new songs it has never seen,
+  judging them purely by their numbers. It does *not* memorize "you like song X".
+- **It scores against the terrain at that moment.** Each rating is recorded with
+  the terrain that song landed on in your run (and the energy/tempo targets there),
+  so it learns "what I want on a climb" separately from "on a descent".
+- **It compounds and persists.** Ratings append to a local `.runic_feedback.jsonl`
+  and the model is refit from your *whole* history on every Generate. The file
+  survives server restarts and reboots — your history only grows and the picks keep
+  sharpening. It never leaves your machine (git-ignored), so it's your private model.
+- **Cold start, then on.** Until ~30 ratings it plays it safe with the default
+  weights (identical to before); after that the results header flips to
+  **"Personalized · N ratings"**. A **Reset learning** button wipes it and starts over.
+
+> Tip: ratings attach to a freshly generated list. After restarting the server,
+> hit **Generate** before rating (an old browser tab from a previous run won't
+> have its songs cached). The saved history is never affected.
 
 ## Tests
 
