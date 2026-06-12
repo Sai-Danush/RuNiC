@@ -23,6 +23,7 @@ web = [
     "python-multipart>=0.0.9",
     "itsdangerous>=2.1",
     "ytmusicapi>=1.8",
+    "scikit-learn>=1.4",
 ]
 
 [project.scripts]

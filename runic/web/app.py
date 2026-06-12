@@ -32,8 +32,9 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from .. import learn
 from ..config import ConfigError, load_spotify_credentials
-from ..effort import build_effort_timeline
+from ..effort import build_effort_timeline, dominant_target
 from ..gpx import parse_route
 from ..matcher import Weights, build_playlist
 from ..models import RouteProfile, Terrain
@@ -81,6 +82,10 @@ app.add_middleware(
 
 # Server-side per-session state (parsed routes are too big for a cookie).
 _ROUTES: dict[str, RouteProfile] = {}
+# Per-session feature cache from the last generate: spotify_id -> {features, terrain}.
+# Lets /api/feedback turn a 👍/👎 into a labeled training row without the browser
+# having to echo back the audio features.
+_FEATURES: dict[str, dict[str, dict]] = {}
 
 
 # --- OAuth helpers ------------------------------------------------------------
@@ -452,12 +457,51 @@ async def api_generate(request: Request):
         raise HTTPException(400, str(exc)) from exc
 
     slots, total_s = build_effort_timeline(route, model)
+
+    # Scoring: a manual w_tempo/w_energy override (for debugging) wins; otherwise use
+    # the personalized model learned from your 👍/👎 history. Cold start ⇒ score_fn is
+    # None ⇒ build_playlist falls back to the default Weights (unchanged behavior).
+    manual = any(k in body for k in ("w_tempo", "w_energy", "tempo_tol"))
     weights = Weights(
         tempo=float(body.get("w_tempo", 0.5)),
         energy=float(body.get("w_energy", 0.4)),
         tempo_tolerance=float(body.get("tempo_tol", 12.0)),
     )
-    entries = build_playlist(slots, total_s, songs, weights=weights)
+    if manual:
+        profile = None
+        score_fn = None
+        explore = 0.0
+    else:
+        profile = learn.train_from_log()
+        score_fn = learn.score_fn_for(profile)
+        n_rated = profile.counts.get("_total", 0)
+        # "Discovery" (default on) mixes in varied picks so there's something new to
+        # rate; exploration decays automatically as ratings accumulate.
+        explore = learn.exploration_temp(n_rated) if body.get("discovery", True) else 0.0
+
+    entries = build_playlist(
+        slots, total_s, songs, weights=weights, score_fn=score_fn, explore=explore
+    )
+
+    # Cache each placed song's features (keyed by spotify id) so a later thumbs-up/down
+    # becomes a labeled row without the browser re-sending audio params.
+    feat_cache: dict[str, dict] = {}
+    for e in entries:
+        terrain, tgt_e, tgt_t = dominant_target(slots, e.start_s, e.end_s)
+        feat_cache[e.song.spotify_id] = {
+            "features": learn.feature_vector(e.song, tgt_e, tgt_t),
+            "terrain": terrain.value,
+        }
+    _FEATURES[_sid(request)] = feat_cache
+
+    personalization = {
+        "active": bool(profile and profile.personalized),
+        "n_total": (profile.counts.get("_total", 0) if profile else learn.n_ratings()),
+        "per_terrain_counts": (
+            {k: v for k, v in profile.counts.items() if k != "_total"}
+            if profile else {}
+        ),
+    }
 
     playlist_s = sum(e.song.duration_s for e in entries)
     return {
@@ -469,6 +513,7 @@ async def api_generate(request: Request):
             "cadence_spm": model.cadence_spm,
             "track_count": len(entries),
         },
+        "personalization": personalization,
         "entries": [
             {
                 "order": e.order,
@@ -487,6 +532,35 @@ async def api_generate(request: Request):
             for e in entries
         ],
     }
+
+
+@app.post("/api/feedback")
+async def api_feedback(request: Request):
+    """Record a 👍/👎 on a generated song as a labeled training row.
+
+    Body: ``{"spotify_id": str, "label": 0|1}``. Features come from the cache the
+    last generate stored for this session, so the browser only sends the verdict.
+    """
+    body = await request.json()
+    spotify_id = (body.get("spotify_id") or "").strip()
+    label = body.get("label")
+    if not spotify_id or label not in (0, 1, True, False):
+        raise HTTPException(400, "Need a spotify_id and a label of 0 or 1.")
+
+    cached = _FEATURES.get(_sid(request), {}).get(spotify_id)
+    if not cached:
+        raise HTTPException(400, "Unknown track for this session — regenerate first.")
+
+    learn.append_event(cached["features"], cached["terrain"], int(bool(label)),
+                       spotify_id=spotify_id)
+    return {"ok": True, "n_total": learn.n_ratings()}
+
+
+@app.post("/api/feedback/reset")
+async def api_feedback_reset():
+    """Forget all learning — clear the feedback log and cached weights."""
+    learn.reset()
+    return {"ok": True, "n_total": 0}
 
 
 @app.post("/api/ytmusic/create")

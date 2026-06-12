@@ -8,11 +8,16 @@ window that song would occupy, then advance by its duration.
 
 from __future__ import annotations
 
+import math
+import random
 import statistics
 from dataclasses import dataclass
 
 from .effort import dominant_target
 from .models import EffortSlot, PlaylistEntry, Song, Terrain
+
+# How many top candidates exploration samples among (when explore > 0).
+_TOP_K = 3
 
 # A song that only matches the cadence at half/double time (e.g. 87 BPM for a
 # 170 stride) syncs mathematically but *feels* slower. Score those octave
@@ -80,18 +85,35 @@ def _reason(terrain: Terrain, song: Song, tgt_energy: float, tgt_tempo: float) -
     )
 
 
-def _best_unused(
-    pool: list[Song], used: set[str], tgt_e: float, tgt_t: float, w: Weights
+def _pick(
+    pool: list[Song], used: set[str], tgt_e: float, tgt_t: float, terrain: Terrain,
+    scorer, explore: float, rng: random.Random,
 ) -> Song | None:
-    """Highest-scoring song not yet used for a given energy/tempo target."""
-    best: tuple[float, Song] | None = None
-    for song in pool:
-        if song.reccobeats_id in used:
-            continue
-        s = score_song(song, tgt_e, tgt_t, w)
-        if best is None or s > best[0]:
-            best = (s, song)
-    return best[1] if best else None
+    """Choose an unused song for a target. With ``explore <= 0`` this is the highest
+    scorer (deterministic, exactly the old behavior); with ``explore > 0`` it samples
+    among the top-K via a softmax at temperature ``explore`` so the list surfaces
+    varied songs to rate."""
+    cands = [
+        (scorer(song, tgt_e, tgt_t, terrain), song)
+        for song in pool
+        if song.reccobeats_id not in used
+    ]
+    if not cands:
+        return None
+    if explore <= 1e-3:
+        return max(cands, key=lambda c: c[0])[1]
+    cands.sort(key=lambda c: c[0], reverse=True)
+    top = cands[:_TOP_K]
+    hi = top[0][0]
+    weights = [math.exp((s - hi) / explore) for s, _ in top]
+    total = sum(weights)
+    threshold = rng.random() * total
+    acc = 0.0
+    for wgt, (_, song) in zip(weights, top):
+        acc += wgt
+        if threshold <= acc:
+            return song
+    return top[-1][1]
 
 
 def build_playlist(
@@ -100,6 +122,9 @@ def build_playlist(
     songs: list[Song],
     *,
     weights: Weights | None = None,
+    score_fn=None,
+    explore: float = 0.0,
+    rng: random.Random | None = None,
 ) -> list[PlaylistEntry]:
     """Fit the run timeline with the best-matching songs.
 
@@ -109,8 +134,17 @@ def build_playlist(
     pool's average get first pick. Steep descents (attack) and recovery climbs
     are the pickiest, so they're served before generic flat sections. Songs are
     then emitted in time order and trimmed to the predicted run length.
+
+    Scoring is pluggable: pass ``score_fn(song, tgt_e, tgt_t, terrain) -> float`` to
+    rank by a learned/personalized model; omit it to use the default ``Weights``
+    (identical to before). ``explore > 0`` turns the per-slot pick into a top-K
+    softmax sample (temperature = ``explore``) to gather varied ratings.
     """
     w = weights or Weights()
+    scorer = score_fn or (
+        lambda song, tgt_e, tgt_t, terrain: score_song(song, tgt_e, tgt_t, w)
+    )
+    rng = rng or random.Random()
     pool = [s for s in songs if s.duration_ms > 0]
     if not pool or total_run_s <= 0:
         return []
@@ -136,7 +170,8 @@ def build_playlist(
     assigned: dict[int, Song] = {}
     for i in demand_order:
         b = buckets[i]
-        song = _best_unused(pool, used, b["tgt_e"], b["tgt_t"], w)
+        song = _pick(pool, used, b["tgt_e"], b["tgt_t"], b["terrain"],
+                     scorer, explore, rng)
         if song is None:
             break
         assigned[i] = song
@@ -171,8 +206,8 @@ def build_playlist(
     # 4. Fallback: real durations may fall short of the run — keep filling with
     #    the best remaining songs so the playlist always covers the distance.
     while clock < total_run_s and len(used) < len(pool):
-        _, tgt_e, tgt_t = dominant_target(slots, clock, clock + rep)
-        song = _best_unused(pool, used, tgt_e, tgt_t, w)
+        terrain, tgt_e, tgt_t = dominant_target(slots, clock, clock + rep)
+        song = _pick(pool, used, tgt_e, tgt_t, terrain, scorer, explore, rng)
         if song is None:
             break
         used.add(song.reccobeats_id)

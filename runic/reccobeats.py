@@ -102,6 +102,10 @@ def fetch_songs(spotify_ids: list[str]) -> tuple[list[Song], list[str]]:
                 valence=float(feat.get("valence") or 0.0),
                 danceability=float(feat.get("danceability") or 0.0),
                 loudness=float(feat.get("loudness") or 0.0),
+                acousticness=float(feat.get("acousticness") or 0.0),
+                instrumentalness=float(feat.get("instrumentalness") or 0.0),
+                speechiness=float(feat.get("speechiness") or 0.0),
+                liveness=float(feat.get("liveness") or 0.0),
             )
         )
     return songs, skipped

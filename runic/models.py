@@ -69,6 +69,13 @@ class Song:
     valence: float
     danceability: float
     loudness: float
+    # Extra ReccoBeats audio factors. Defaulted so older callers / fixtures that
+    # predate them still construct a Song; the personalization model learns over
+    # these alongside the originals.
+    acousticness: float = 0.0
+    instrumentalness: float = 0.0
+    speechiness: float = 0.0
+    liveness: float = 0.0
 
     @property
     def duration_s(self) -> float:

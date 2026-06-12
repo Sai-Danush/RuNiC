@@ -519,9 +519,10 @@ function fmt(s) {
 
 let lastResults = null;
 let debugMode = false;
+let ratings = {};   // spotify_id -> 1|0 for the current generation
 
 function renderResults(res) {
-  if (res) { lastResults = res; lastEntries = res.entries; }
+  if (res) { lastResults = res; lastEntries = res.entries; ratings = {}; }
   const data = lastResults;
   if (!data) return;
   const s = data.summary;
@@ -540,6 +541,12 @@ function renderResults(res) {
     summary += ` · cadence <b>${Math.round(s.cadence_spm)}</b> SPM · ${s.candidate_count} candidates`
       + (s.skipped_count ? ` (${s.skipped_count} not in ReccoBeats)` : "");
   }
+  const pz = data.personalization;
+  if (pz) {
+    summary += pz.active
+      ? ` · <span class="pz on">★ Personalized · ${pz.n_total} ratings</span>`
+      : ` · <span class="pz">Learning · ${pz.n_total} ratings (rate songs below)</span>`;
+  }
   $("resultSummary").innerHTML = summary;
 
   const dbgHead = debugMode ? "<th>BPM</th><th>Energy</th><th>Why</th>" : "";
@@ -547,6 +554,7 @@ function renderResults(res) {
     const dbg = debugMode
       ? `<td>${e.bpm}</td><td>${e.energy}</td><td class="muted">${escapeHtml(e.reason)}</td>`
       : "";
+    const r = ratings[e.spotify_id];
     return `
     <tr>
       <td>${e.order}</td>
@@ -554,16 +562,54 @@ function renderResults(res) {
       <td><span class="terr ${e.terrain}">${e.terrain.replace("_", " ")}</span></td>
       <td><a href="${e.url}" target="_blank">${escapeHtml(e.title)}</a><br>
           <span class="muted">${escapeHtml(e.artist)}</span></td>
+      <td class="rate">
+        <button class="thumb up${r === 1 ? " on" : ""}" title="more like this for this terrain" onclick="rateSong('${e.spotify_id}',1)">👍</button>
+        <button class="thumb down${r === 0 ? " on" : ""}" title="less like this" onclick="rateSong('${e.spotify_id}',0)">👎</button>
+      </td>
       ${dbg}
     </tr>`;
   }).join("");
   $("resultTable").innerHTML = `<table>
-    <thead><tr><th>#</th><th>Time</th><th>Terrain</th><th>Song</th>${dbgHead}</tr></thead>
+    <thead><tr><th>#</th><th>Time</th><th>Terrain</th><th>Song</th><th>Rate</th>${dbgHead}</tr></thead>
     <tbody>${rows}</tbody></table>`;
   if (res) $("results").scrollIntoView({ behavior: "smooth" });
 }
 
 $("debugToggle").onchange = (e) => { debugMode = e.target.checked; renderResults(); };
+
+// 👍/👎 a generated song → a labeled training row. Regenerate to feel the effect.
+async function rateSong(spotifyId, label) {
+  try {
+    const res = await api("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spotify_id: spotifyId, label }),
+    });
+    ratings[spotifyId] = label;
+    if (lastResults && lastResults.personalization)
+      lastResults.personalization.n_total = res.n_total;
+    renderResults();   // refresh thumb states + the ratings count
+  } catch (err) {
+    $("copyMsg").textContent = "Rating failed: " + err.message;
+  }
+}
+
+$("resetLearnBtn").onclick = async () => {
+  if (!confirm("Forget everything Runic has learned from your ratings?")) return;
+  try {
+    await api("/api/feedback/reset", { method: "POST" });
+    ratings = {};
+    if (lastResults && lastResults.personalization) {
+      lastResults.personalization.active = false;
+      lastResults.personalization.n_total = 0;
+    }
+    renderResults();
+    $("copyMsg").textContent = "Learning reset.";
+    setTimeout(() => { $("copyMsg").textContent = ""; }, 3000);
+  } catch (err) {
+    $("copyMsg").textContent = "Reset failed: " + err.message;
+  }
+};
 
 $("copyBtn").onclick = async () => {
   const links = lastEntries.map((e) => e.url).join("\n");
