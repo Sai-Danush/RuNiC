@@ -163,3 +163,8 @@ pytest -q
   natively.)
 - **The in-browser player needs Spotify Premium and a desktop browser** — it won't
   play on iOS Safari or Android Chrome. Use the exports for mobile playback.
+- **Personalization needs warming up.** It stays on the default weights until ~30
+  ratings, then personalizes — so the first few runs feel un-tuned by design.
+- **Personalization tunes *weighting*, not identities.** It learns how much each
+  audio factor should count per terrain; it does not learn "I like this artist /
+  genre / song" (it's purely parameter-based, so it generalizes to unseen tracks).
