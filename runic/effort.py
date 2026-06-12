@@ -7,21 +7,25 @@ from .models import EffortSlot, RouteProfile, Terrain
 from .pace import PaceModel, segment_time_s
 
 # Terrain -> desired song energy (0..1). Tunable.
+# Philosophy: descents are for *attacking* (free speed, high turnover) so they
+# get the hottest tracks; climbs are for *cruising/recovery* so they get chiller
+# tracks. The ramp is monotonic — the steeper the drop, the harder the song.
 _TERRAIN_ENERGY: dict[Terrain, float] = {
-    Terrain.STEEP_UP: 0.90,
-    Terrain.UP: 0.80,
+    Terrain.STEEP_DOWN: 0.90,
+    Terrain.DOWN: 0.80,
     Terrain.FLAT: 0.65,
-    Terrain.DOWN: 0.50,
-    Terrain.STEEP_DOWN: 0.55,
+    Terrain.UP: 0.55,
+    Terrain.STEEP_UP: 0.50,
 }
 
-# Extra tempo (BPM) added to the base cadence on climbs, to lift the push.
+# Extra tempo (BPM) added to the base cadence on descents, to lift the attack;
+# climbs pull tempo down for a calmer, cruise-y feel.
 _TERRAIN_TEMPO_BONUS: dict[Terrain, float] = {
-    Terrain.STEEP_UP: 6.0,
-    Terrain.UP: 3.0,
+    Terrain.STEEP_DOWN: 6.0,
+    Terrain.DOWN: 3.0,
     Terrain.FLAT: 0.0,
-    Terrain.DOWN: -2.0,
-    Terrain.STEEP_DOWN: -1.0,
+    Terrain.UP: -2.0,
+    Terrain.STEEP_UP: -3.0,
 }
 
 

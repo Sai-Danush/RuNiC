@@ -24,12 +24,13 @@ def test_timeline_is_contiguous_and_positive():
     assert abs(slots[-1].end_s - total) < 1e-6
 
 
-def test_climb_targets_more_energy_than_descent():
+def test_descent_targets_more_energy_than_climb():
     slots, _ = _setup()
     up = [s.target_energy for s in slots if s.terrain in (Terrain.UP, Terrain.STEEP_UP)]
     down = [s.target_energy for s in slots if s.terrain in (Terrain.DOWN, Terrain.STEEP_DOWN)]
     assert up and down
-    assert max(up) > max(down)
+    # Descents attack (hot tracks); climbs cruise (chill tracks).
+    assert max(down) > max(up)
 
 
 def test_dominant_target_picks_overlapping_terrain():
